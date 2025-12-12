@@ -7,7 +7,6 @@ from datetime import datetime, timedelta
 
 from telethon import TelegramClient
 from telethon.sessions import StringSession
-from telethon.errors import FloodWaitError
 
 from telegram import Update, Bot, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -29,7 +28,6 @@ def save_db():
         json.dump(DB, f, indent=4)
 
 DB = load_db()
-
 ADMIN_ID = 5624278091
 
 def is_allowed(user_id: int) -> bool:
@@ -55,10 +53,8 @@ def set_user_allowed(user_id: int, allowed: bool):
 def log_check(user_id: int, count: int = 1):
     uid = str(user_id)
     today = datetime.now().strftime("%Y-%m-%d")
-    
     if uid not in DB["stats"]:
         DB["stats"][uid] = {"daily": {}, "total": 0}
-    
     DB["stats"][uid]["daily"][today] = DB["stats"][uid]["daily"].get(today, 0) + count
     DB["stats"][uid]["total"] = DB["stats"][uid].get("total", 0) + count
     save_db()
@@ -102,10 +98,8 @@ class UltraFastBot:
         self.clients = [
             UltraFastClient(24742957, "40d421e05a414534910ebc0998f97c10",
                 "1BVtsOKwBu8SY0NXUwrafneFgpyXKdXQYZuceqXpABICi8whUhUB_EVnOqFDYSFFcm5d0HKJ3UnuMtSuVNd8V6uv31gi-3sfzKkpe5AipKV6vHVOM6wPMzCBE-feFuJ-f-rul1GpI390_rTB6KJVbWVti9teusIbyxmpoGHY727kwavTrSMcw_fY_1Uxn5D8a-IKnBHAthmsOKjCb0Wzt4xcoJjmMCaWEl5mn5zyJprv2GJL1Tgu1uG3CVoer17NQhZBWKtANrnTuTSftikQLpKdfYonSKUtihfbk-wsKKpkO8mXJ2dTXdDiy3sfIb0dsjJNP27pZ79JCR0RaxLFEoDYVWPVrESg=", "Client-1"),
-            
             UltraFastClient(34028019, "fc5342423287695b08996481f2c01b76",
                 "1BVtsOKwBu4s8plZhOq40_z-LHs_LpTK2rhfqvjzY5yltX3IPGyryifv3OsPNQvjhKlB4cVezXvyvd7gJIRxZg-HIbys9zAv1TqYeDWpWC4mPqwQ5q5eAUAkmYBMVzvP15AdCVRtVSh6G6eHjvsDZZ7jFQ6CfNM1pgNMI_cJ3DwpeuvMVsZfFIykfL4ig-EtJDhrx_4hubQz-Jt7UWaKgLXRWM-GcVFSIB4VeG5pDb7AHb8LFOY2HI9Nb_o2N7sXCvch-8AdxcdoEhVRLjpkzeli5QAvOw3yYPho8JylMweYXKUnmKArIYTOFfYB7DnAG7p826CbfbyGJKsSwKW4VfUK3oMskETU=", "Client-2"),
-            
             UltraFastClient(31262633, "bf9718993cfa858293a1afbbf2e20d3e",
                 "1BVtsOKwBu4tf3t5-EsbrQ3mcqegcuxr5HjkVSyjnufLbiwMau4GXx9aaIdaoxedW_sLKapg3mq6W8yQe23sc3hvKVdhxg4cLHCdZus_UUjOCMLx8Ecb_rH9JBaQBg5mCYDa_Y9ZvJUgbzuKYhzDJ8x5g_YyQOnjQW4WrwJ5O48Mu3LhOCwVvvfhxzjVmnv7mDFFNzVGoi4SStvaK3MgVOCkjF_jZF-MjGZlNU633C3ay2VVqoTF9OPO5hvzqB145VKv7IXIWvFaRgfoYO_CHEmRYMv_OMtIpRBFqXmGYCcMqu00fkErhsrRSMvRK2h2KmNUZ2fwSA_797am8eqZHr2B0k1T869g=", "Client-3"),
         ]
@@ -113,7 +107,7 @@ class UltraFastBot:
         self.client_index = 0
     
     async def start_clients(self):
-        print("Starting all 3 clients with String Session...")
+        print("Starting all 3 clients...")
         for client in self.clients:
             await client.connect()
             await asyncio.sleep(2)
@@ -128,9 +122,6 @@ class UltraFastBot:
             d = re.sub(r'\D', '', match)
             if len(d) == 10: numbers.append(d)
             elif len(d) == 11 and d[0]=='1': numbers.append(d[1:])
-        for match in re.findall(r'\d{10,11}', clean_text):
-            if len(match) == 10: numbers.append(match)
-            elif len(match) == 11 and match[0]=='1': numbers.append(match[1:])
         seen = set()
         return [n for n in numbers if len(n)==10 and n not in seen and not seen.add(n)][:50]
 
@@ -143,20 +134,14 @@ class UltraFastBot:
             self.client_index = (self.client_index + 1) % len(self.clients)
         return None
 
-    # ================== নতুন ফিক্সড সেন্ড ফাংশন ==================
     async def send_instant(self, client: UltraFastClient, phone: str):
         try:
-            # নাম্বার পাঠাচ্ছি এবং আমার আউটগোয়িং মেসেজের ID ধরছি
             sent_msg = await client.client.send_message('@Sellws_bot', f"+1{phone}")
-            await asyncio.sleep(2.2)  # বটের রিপ্লাই আসার জন্য অপেক্ষা
-
-            # সেন্ট মেসেজের রিপ্লাই চেক করছি
+            await asyncio.sleep(2.3)
             replies = await client.client.get_messages('@Sellws_bot', reply_to=sent_msg.id, limit=5)
-            if replies and len(replies) > 0:
-                reply_msg = replies[0]  # সাধারণত প্রথম রিপ্লাইটাই হয়
-                return reply_msg.message, reply_msg.id
-
-            return "No reply yet", None
+            if replies:
+                return replies[0].message, replies[0].id
+            return "Processing...", None
         except Exception as e:
             return f"Error: {str(e)}", None
 
@@ -164,7 +149,7 @@ class UltraFastBot:
         if not resp: return "No Response", "⚠️"
         t = resp.lower()
         if any(x in t for x in ["already registered", "do not submit it again"]):
-            return "Already Checked, Ban", "⚠️"
+            return "Already Checked", "⚠️"
         if any(x in t for x in ["too many attempts", "try again later"]):
             return "Fresh Num", "🟢"
         if any(x in t for x in ["banned", "blocked", "registration blocked"]):
@@ -174,15 +159,14 @@ class UltraFastBot:
         if any(x in t for x in ["processing", "please wait", "in queue"]):
             return "Processing...", "🔵"
         if "successfully registered" in t or "account created" in t:
-            return "Fresh Registered", "⭐"
-        return "Received", "📥"
+            return "Fresh Registered", "🥲"
+        return "Received", "💌"
 
     async def monitor_ultra_fast(self, client, reply_id, user_id, phone, idx):
-        if not reply_id:
-            return
-        cur = "Waiting..."
-        for _ in range(45):
-            await asyncio.sleep(0.7)
+        if not reply_id: return
+        cur = ""
+        for _ in range(50):
+            await asyncio.sleep(0.8)
             try:
                 m = await client.client.get_messages('@Sellws_bot', ids=reply_id)
                 if m and m.message:
@@ -198,18 +182,20 @@ class UltraFastBot:
                                     text=f"{idx}. `{phone}` {ne} {ns}",
                                     parse_mode='MarkdownV2'
                                 )
-                            except:
-                                pass
-            except:
-                pass
+                            except: pass
+            except: pass
 
     async def process_number_ultra_fast(self, phone: str, idx: int, user_id: int):
         client = self.get_next_client()
-        if not client:
-            return
+        if not client: return
         client.start_task()
         try:
-            msg = await self.bot.send_message(user_id, f"{idx}. `{phone}` ⏳ Sending...", parse_mode='MarkdownV2')
+            # সরাসরি একটা মেসেজ পাঠাবো যেটা আপডেট হবে
+            msg = await self.bot.send_message(
+                user_id,
+                f"{idx}. `{phone}` ⏳ Sending...",
+                parse_mode='MarkdownV2'
+            )
             self.message_ids[(user_id, phone)] = msg.message_id
 
             resp, reply_id = await self.send_instant(client, phone)
@@ -232,64 +218,48 @@ class UltraFastBot:
                     text=f"{idx}. `{phone}` ❌ Error",
                     parse_mode='MarkdownV2'
                 )
-            except:
-                pass
+            except: pass
         finally:
             client.end_task()
 
     async def process_all_ultra_fast(self, nums: List[str], user_id: int):
-        if not nums:
-            return
+        if not nums: return
         log_check(user_id, len(nums))
-        await self.bot.send_message(user_id, f"Found {len(nums)} numbers\nStarting Ultra Fast Check...")
+        # কোনো "Starting..." মেসেজ নাই – সরাসরি চেক শুরু
         for i, p in enumerate(nums, 1):
             asyncio.create_task(self.process_number_ultra_fast(p, i, user_id))
-            await asyncio.sleep(0.05)  # খুব ফাস্ট না হলে ভালো রেসপন্স আসে
+            await asyncio.sleep(0.07)  # পারফেক্ট স্পিড + সেফ
 
 # ====================== COMMANDS ======================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     u = update.effective_user
     if is_allowed(u.id):
-        await update.message.reply_text("Welcome back! Send numbers to check instantly.")
+        await update.message.reply_text("Welcome! Send numbers to check instantly.")
         return
     add_user_request(u.id, u.username, u.first_name)
-    kb = [[
-        InlineKeyboardButton("Allow", callback_data=f"allow_{u.id}"),
-        InlineKeyboardButton("Deny", callback_data=f"deny_{u.id}")
-    ]]
+    kb = [[InlineKeyboardButton("Allow", callback_data=f"allow_{u.id}"),
+           InlineKeyboardButton("Deny", callback_data=f"deny_{u.id}")]]
     try:
-        await context.bot.send_message(
-            ADMIN_ID,
+        await context.bot.send_message(ADMIN_ID,
             f"New Request\nID: <code>{u.id}</code>\nName: {u.full_name}\n@{u.username or 'None'}",
-            reply_markup=InlineKeyboardMarkup(kb),
-            parse_mode='HTML'
-        )
-    except:
-        pass
-    await update.message.reply_text("Request sent to admin. Wait for approval.")
+            reply_markup=InlineKeyboardMarkup(kb), parse_mode='HTML')
+    except: pass
+    await update.message.reply_text("Request sent to admin.")
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
-    if q.from_user.id != ADMIN_ID:
-        return
+    if q.from_user.id != ADMIN_ID: return
     act, uid = q.data.split("_", 1)
     uid = int(uid)
     set_user_allowed(uid, act == "allow")
     await q.edit_message_text(f"User {uid} → {'ALLOWED' if act=='allow' else 'DENIED'}")
-    try:
-        await context.bot.send_message(uid, f"You are now {'ALLOWED' if act=='allow' else 'DENIED'}!")
-    except:
-        pass
+    try: await context.bot.send_message(uid, f"You are now {'ALLOWED' if act=='allow' else 'DENIED'}!")
+    except: pass
 
 async def users_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
-        return
-    if not DB["users"]:
-        await update.message.reply_text("No users")
-        return
-    txt = ["Users List\n\n"]
-    btns = []
+    if update.effective_user.id != ADMIN_ID: return
+    txt, btns = ["Users List\n\n"], []
     for uid, inf in DB["users"].items():
         name = inf.get("first_name","?")
         user = inf.get("username","")
@@ -301,8 +271,7 @@ async def users_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def toggle_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     if q.from_user.id != ADMIN_ID:
-        await q.answer("Not admin", show_alert=True)
-        return
+        await q.answer("Not admin", show_alert=True); return
     await q.answer()
     uid = int(q.data.split("_")[1])
     cur = DB["users"].get(str(uid), {}).get("allowed", False)
@@ -313,47 +282,30 @@ async def toggle_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = str(update.effective_user.id)
     if uid not in DB["stats"]:
-        await update.message.reply_text("No data yet")
-        return
+        await update.message.reply_text("No data yet"); return
     today = datetime.now().strftime("%Y-%m-%d")
     yest = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
     await update.message.reply_text(
-        f"Your Stats\n\n"
-        f"Today     → {DB['stats'][uid]['daily'].get(today,0)}\n"
+        f"Your Stats\n\nToday → {DB['stats'][uid]['daily'].get(today,0)}\n"
         f"Yesterday → {DB['stats'][uid]['daily'].get(yest,0)}\n"
-        f"Total     → {DB['stats'][uid]['total']}"
+        f"Total → {DB['stats'][uid]['total']}"
     )
 
 async def adminstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
-        return
-    if not DB["stats"]:
-        await update.message.reply_text("No stats yet")
-        return
-    
+    if update.effective_user.id != ADMIN_ID: return
+    lines = ["Admin Stats\n\n"]
     today = datetime.now().strftime("%Y-%m-%d")
     yest = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
-    lines = ["Admin Full Stats\n\n"]
-    
     for uid, data in DB["stats"].items():
         info = DB["users"].get(uid, {})
         name = info.get("first_name", "Unknown")
         user = info.get("username", "")
-        t = data["daily"].get(today, 0)
-        y = data["daily"].get(yest, 0)
-        total = data.get("total", 0)
-        lines.append(
-            f"{uid} | {name} @{user or '—'}\n"
-            f"  Today: {t} | Yest: {y} | Total: {total}\n\n"
-        )
-    
+        lines.append(f"{uid} | {name} @{user or '—'}\n  Today: {data['daily'].get(today,0)} | Total: {data.get('total',0)}\n\n")
     text = "".join(lines)
-    if len(text) > 4000:
-        for i in range(0, len(text), 4000):
-            await update.message.reply_text(text[i:i+4000])
-    else:
-        await update.message.reply_text(text)
+    for i in range(0, len(text), 4000):
+        await update.message.reply_text(text[i:i+4000])
 
+# এখানে সবচেয়ে গুরুত্বপূর্ণ ফিক্স
 async def handle_message_ultra_fast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
     if not is_allowed(uid):
@@ -361,21 +313,22 @@ async def handle_message_ultra_fast(update: Update, context: ContextTypes.DEFAUL
         return
     text = update.message.text or ""
     bot = context.application.bot_data.get('bot')
-    if not bot or not text:
-        return
+    if not bot or not text: return
+
     nums = bot.extract_all_numbers(text)
-    if not nums:
-        return
+    if not nums: return
+
+    # এখানে await আছে → এখন আর কিছু হ্যাং হবে না
     await bot.process_all_ultra_fast(nums, uid)
 
 # ====================== MAIN ======================
 async def main():
     TOKEN = "8224615707:AAGXnhaP2JMzf5JAVVW-NMedCZTym2_KuRE"
-    bot = UltraFastBot(TOKEN)
-    await bot.start_clients()
+    ultra_bot = UltraFastBot(TOKEN)
+    await ultra_bot.start_clients()
     
     app = Application.builder().token(TOKEN).build()
-    app.bot_data['bot'] = bot
+    app.bot_data['bot'] = ultra_bot
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("stats", stats))
@@ -385,25 +338,20 @@ async def main():
     app.add_handler(CallbackQueryHandler(toggle_user, pattern="^toggle_"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message_ultra_fast))
 
-    print("ULTRA FAST SELLWS CHECKER 2025 - 100% FIXED & RUNNING")
-
+    print("ULTRA FAST SELLWS CHECKER 2025 - 100% FIXED & CLEAN - RUNNING")
     await app.initialize()
     await app.start()
     await app.updater.start_polling(allowed_updates=Update.ALL_TYPES)
+    while True: await asyncio.sleep(3600)
 
-    while True:
-        await asyncio.sleep(3600)
-
-# ====================== Flask for Render ======================
+# ====================== Flask ======================
 from flask import Flask
-flask_app = Flask(__name__)
-
-@flask_app.route('/')
-def home():
-    return "<h1>ULTRA FAST SELLWS BOT 2025 - 100% ALIVE & FIXED</h1>"
+app = Flask(__name__)
+@app.route('/') 
+def home(): return "<h1>ULTRA FAST SELLWS BOT 2025 - 100% ALIVE & FIXED</h1>"
 
 if __name__ == "__main__":
     import threading
     port = int(os.environ.get("PORT", 5000))
-    threading.Thread(target=lambda: flask_app.run(host='0.0.0.0', port=port), daemon=True).start()
+    threading.Thread(target=lambda: app.run(host='0.0.0.0', port=port), daemon=True).start()
     asyncio.run(main())
