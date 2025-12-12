@@ -159,13 +159,13 @@ class UltraFastBot:
         if not resp: return "No Response", "⚠️"
         t = resp.lower()
         if any(x in t for x in ["already registered", "do not submit it again"]):
-            return "Already on WhatsApp", "⚠️"
+            return "Already Checked, Ban", "⚠️"
         if any(x in t for x in ["too many attempts", "try again later"]):
             return "Fresh Num", "🟢"
         if any(x in t for x in ["banned", "blocked", "registration blocked"]):
             return "Banned", "🚫"
         if any(x in t for x in ["otp verification code has been sent", "please enter the verification code", "6-digit code"]):
-            return "OTP Sent", "❗️ Ws Opened"   
+            return "Ws Opened", "💩"   
         if any(x in t for x in ["processing", "please wait", "in queue"]):
             return "Processing...", "🔵"
         if "successfully registered" in t or "account created" in t:
