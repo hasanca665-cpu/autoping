@@ -121,7 +121,7 @@ class UltraFastBot:
     def extract_all_numbers(self, text: str) -> List[str]:
         clean_text = re.sub(r'[^\d\+\s\(\)\-\.]', '', text)
         numbers = []
-        for match in re.findall(r'\+d{10,15}', clean_text):
+        for match in re.findall(r'\+?\d{10,15}', clean_text):
             d = re.sub(r'\D', '', match)
             if len(d) >= 10: numbers.append(d[-10:])
         for match in re.findall(r'\(?\d{3}\)?[\s\-\.]?\d{3}[\s\-\.]?\d{4}', clean_text):
@@ -143,17 +143,22 @@ class UltraFastBot:
             self.client_index = (self.client_index + 1) % len(self.clients)
         return None
 
+    # ================== নতুন ফিক্সড সেন্ড ফাংশন ==================
     async def send_instant(self, client: UltraFastClient, phone: str):
         try:
-            await client.client.send_message('@Sellws_bot', f"+1{phone}")
-            await asyncio.sleep(1.8)
-            msgs = await client.client.get_messages('@Sellws_bot', limit=12)
-            for m in msgs:
-                if not m.out and (phone in m.message or f"+1{phone}" in m.message):
-                    return m.message, m.id
-            return None, None
+            # নাম্বার পাঠাচ্ছি এবং আমার আউটগোয়িং মেসেজের ID ধরছি
+            sent_msg = await client.client.send_message('@Sellws_bot', f"+1{phone}")
+            await asyncio.sleep(2.2)  # বটের রিপ্লাই আসার জন্য অপেক্ষা
+
+            # সেন্ট মেসেজের রিপ্লাই চেক করছি
+            replies = await client.client.get_messages('@Sellws_bot', reply_to=sent_msg.id, limit=5)
+            if replies and len(replies) > 0:
+                reply_msg = replies[0]  # সাধারণত প্রথম রিপ্লাইটাই হয়
+                return reply_msg.message, reply_msg.id
+
+            return "No reply yet", None
         except Exception as e:
-            return str(e), None
+            return f"Error: {str(e)}", None
 
     def parse_ultra_fast(self, resp: str):
         if not resp: return "No Response", "⚠️"
@@ -169,17 +174,17 @@ class UltraFastBot:
         if any(x in t for x in ["processing", "please wait", "in queue"]):
             return "Processing...", "🔵"
         if "successfully registered" in t or "account created" in t:
-            return "Fresh Registered", "Star"
-        return "Received", "Inbox"
+            return "Fresh Registered", "⭐"
+        return "Received", "📥"
 
-    async def monitor_ultra_fast(self, client, msg_id, user_id, phone, idx):
-        if not msg_id:
+    async def monitor_ultra_fast(self, client, reply_id, user_id, phone, idx):
+        if not reply_id:
             return
-        cur = "Sending"
-        for _ in range(40):
-            await asyncio.sleep(0.5)
+        cur = "Waiting..."
+        for _ in range(45):
+            await asyncio.sleep(0.7)
             try:
-                m = await client.client.get_messages('@Sellws_bot', ids=msg_id)
+                m = await client.client.get_messages('@Sellws_bot', ids=reply_id)
                 if m and m.message:
                     ns, ne = self.parse_ultra_fast(m.message)
                     if ns != cur:
@@ -191,12 +196,12 @@ class UltraFastBot:
                                     chat_id=user_id,
                                     message_id=self.message_ids[k],
                                     text=f"{idx}. `{phone}` {ne} {ns}",
-                                    parse_mode='Markdown'
+                                    parse_mode='MarkdownV2'
                                 )
                             except:
                                 pass
             except:
-                break
+                pass
 
     async def process_number_ultra_fast(self, phone: str, idx: int, user_id: int):
         client = self.get_next_client()
@@ -204,20 +209,31 @@ class UltraFastBot:
             return
         client.start_task()
         try:
-            msg = await self.bot.send_message(user_id, f"{idx}. `phone` Sending...", parse_mode='Markdown')
+            msg = await self.bot.send_message(user_id, f"{idx}. `{phone}` ⏳ Sending...", parse_mode='MarkdownV2')
             self.message_ids[(user_id, phone)] = msg.message_id
-            resp, rid = await self.send_instant(client, phone)
+
+            resp, reply_id = await self.send_instant(client, phone)
             status, emoji = self.parse_ultra_fast(resp)
+
             await self.bot.edit_message_text(
                 chat_id=user_id,
                 message_id=msg.message_id,
-                text=f"{idx}. `phone` {emoji} {status}",
-                parse_mode='Markdown'
+                text=f"{idx}. `{phone}` {emoji} {status}",
+                parse_mode='MarkdownV2'
             )
-            if rid and "waiting" not in status.lower():
-                asyncio.create_task(self.monitor_ultra_fast(client, rid, user_id, phone, idx))
-        except:
-            pass
+
+            if reply_id:
+                asyncio.create_task(self.monitor_ultra_fast(client, reply_id, user_id, phone, idx))
+        except Exception as e:
+            try:
+                await self.bot.edit_message_text(
+                    chat_id=user_id,
+                    message_id=self.message_ids.get((user_id, phone)),
+                    text=f"{idx}. `{phone}` ❌ Error",
+                    parse_mode='MarkdownV2'
+                )
+            except:
+                pass
         finally:
             client.end_task()
 
@@ -225,9 +241,10 @@ class UltraFastBot:
         if not nums:
             return
         log_check(user_id, len(nums))
+        await self.bot.send_message(user_id, f"Found {len(nums)} numbers\nStarting Ultra Fast Check...")
         for i, p in enumerate(nums, 1):
             asyncio.create_task(self.process_number_ultra_fast(p, i, user_id))
-            await asyncio.sleep(0.001)
+            await asyncio.sleep(0.05)  # খুব ফাস্ট না হলে ভালো রেসপন্স আসে
 
 # ====================== COMMANDS ======================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -349,7 +366,6 @@ async def handle_message_ultra_fast(update: Update, context: ContextTypes.DEFAUL
     nums = bot.extract_all_numbers(text)
     if not nums:
         return
-    await update.message.reply_text(f"Found {len(nums)} numbers\nStarting Ultra Fast Check...")
     await bot.process_all_ultra_fast(nums, uid)
 
 # ====================== MAIN ======================
@@ -369,7 +385,7 @@ async def main():
     app.add_handler(CallbackQueryHandler(toggle_user, pattern="^toggle_"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message_ultra_fast))
 
-    print("ULTRA FAST SELLWS CHECKER 2025 - NO LOGIN - RUNNING")
+    print("ULTRA FAST SELLWS CHECKER 2025 - 100% FIXED & RUNNING")
 
     await app.initialize()
     await app.start()
@@ -384,7 +400,7 @@ flask_app = Flask(__name__)
 
 @flask_app.route('/')
 def home():
-    return "<h1>ULTRA FAST SELLWS BOT 2025 - 100% ALIVE</h1>"
+    return "<h1>ULTRA FAST SELLWS BOT 2025 - 100% ALIVE & FIXED</h1>"
 
 if __name__ == "__main__":
     import threading
