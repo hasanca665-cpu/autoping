@@ -146,7 +146,7 @@ class UltraFastBot:
     async def send_instant(self, client: UltraFastClient, phone: str):
         try:
             await client.client.send_message('@Sellws_bot', f"+1{phone}")
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(3.5)
             msgs = await client.client.get_messages('@Sellws_bot', limit=30)
             for m in msgs:
                 if not m.out and (phone in m.message or f"+1{phone}" in m.message):
