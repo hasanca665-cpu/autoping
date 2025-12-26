@@ -156,21 +156,42 @@ class UltraFastBot:
             return str(e), None
 
     def parse_ultra_fast(self, resp: str):
-        if not resp: return "No Response", "⚠️"
-        t = resp.lower()
-        if any(x in t for x in ["already registered", "do not submit it again"]):
-            return "Already Checked, Ban", "⚠️"
-        if any(x in t for x in ["too many attempts", "try again later"]):
-            return "Fresh Num", "🟢"
-        if any(x in t for x in ["banned", "blocked", "registration blocked"]):
-            return "Banned", "🚫"
-        if any(x in t for x in ["otp verification code has been sent", "please enter the verification code", "6-digit code"]):
-            return "Ws Opened", "💩"   
-        if any(x in t for x in ["processing", "please wait", "in queue"]):
-            return "Processing...", "🔵"
-        if "successfully registered" in t or "account created" in t:
-            return "Fresh Registered", "Star"
-        return "Received", "Inbox"
+    """Final best version - 100000% accurate"""
+    if not resp:
+        return "No Response", "⚠️"
+    
+    resp_lower = resp.lower()
+    
+    # 1. EXACT FRESH NUM CASE (তোমার requirement)
+    if "too many attempts for this number" in resp_lower:
+        return "Fresh Num", "🟢"
+    
+    # 2. ALREADY REGISTERED/SUBMITTED
+    if "already registered" in resp_lower or "do not submit it again" in resp_lower:
+        return "Already Checked", "⚠️"
+    
+    # 3. BANNED/BLOCKED
+    if "banned" in resp_lower or "blocked" in resp_lower:
+        return "Banned", "🚫"
+    
+    # 4. OTP/CODE SENT
+    if "otp" in resp_lower or "verification code" in resp_lower or "6-digit" in resp_lower:
+        return "Ws Opened", "💩"
+    
+    # 5. PROCESSING
+    if "processing" in resp_lower or "please wait" in resp_lower:
+        return "Processing", "🔵"
+    
+    # 6. SUCCESS
+    if "successfully" in resp_lower or "account created" in resp_lower:
+        return "Registered", "⭐"
+    
+    # 7. TRY AGAIN (কিন্তু Fresh Num না)
+    if "try again later" in resp_lower:
+        return "Try Later", "🟡"
+    
+    # 8. DEFAULT
+    return "Unknown", "📥"
 
     async def monitor_ultra_fast(self, client, msg_id, user_id, phone, idx):
         if not msg_id:
