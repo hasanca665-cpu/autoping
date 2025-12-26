@@ -15,7 +15,6 @@ from telegram.ext import (
     filters, ContextTypes
 )
 
-# ====================== DATABASE ======================
 DB_FILE = "user_db.json"
 
 def load_db():
@@ -63,7 +62,6 @@ def log_check(user_id: int, count: int = 1):
     DB["stats"][uid]["total"] = DB["stats"][uid].get("total", 0) + count
     save_db()
 
-# ====================== ULTRA FAST BOT ======================
 class UltraFastClient:
     def __init__(self, api_id: int, api_hash: str, session_string: str, name: str):
         self.api_id = api_id
@@ -156,42 +154,33 @@ class UltraFastBot:
             return str(e), None
 
     def parse_ultra_fast(self, resp: str):
-    """Final best version - 100000% accurate"""
-    if not resp:
-        return "No Response", "⚠️"
-    
-    resp_lower = resp.lower()
-    
-    # 1. EXACT FRESH NUM CASE (তোমার requirement)
-    if "too many attempts for this number" in resp_lower:
-        return "Fresh Num", "🟢"
-    
-    # 2. ALREADY REGISTERED/SUBMITTED
-    if "already registered" in resp_lower or "do not submit it again" in resp_lower:
-        return "Already Checked", "⚠️"
-    
-    # 3. BANNED/BLOCKED
-    if "banned" in resp_lower or "blocked" in resp_lower:
-        return "Banned", "🚫"
-    
-    # 4. OTP/CODE SENT
-    if "otp" in resp_lower or "verification code" in resp_lower or "6-digit" in resp_lower:
-        return "Ws Opened", "💩"
-    
-    # 5. PROCESSING
-    if "processing" in resp_lower or "please wait" in resp_lower:
-        return "Processing", "🔵"
-    
-    # 6. SUCCESS
-    if "successfully" in resp_lower or "account created" in resp_lower:
-        return "Registered", "⭐"
-    
-    # 7. TRY AGAIN (কিন্তু Fresh Num না)
-    if "try again later" in resp_lower:
-        return "Try Later", "🟡"
-    
-    # 8. DEFAULT
-    return "Unknown", "📥"
+        if not resp:
+            return "No Response", "⚠️"
+        
+        resp_lower = resp.lower()
+        
+        if "too many attempts for this number" in resp_lower:
+            return "Fresh Num", "🟢"
+        
+        if "already registered" in resp_lower or "do not submit it again" in resp_lower:
+            return "Already Checked", "⚠️"
+        
+        if "banned" in resp_lower or "blocked" in resp_lower:
+            return "Banned", "🚫"
+        
+        if "otp" in resp_lower or "verification code" in resp_lower or "6-digit" in resp_lower:
+            return "Ws Opened", "💩"
+        
+        if "processing" in resp_lower or "please wait" in resp_lower:
+            return "Processing", "🔵"
+        
+        if "successfully" in resp_lower or "account created" in resp_lower:
+            return "Registered", "⭐"
+        
+        if "try again later" in resp_lower:
+            return "Try Later", "🟡"
+        
+        return "Unknown", "📥"
 
     async def monitor_ultra_fast(self, client, msg_id, user_id, phone, idx):
         if not msg_id:
@@ -225,14 +214,14 @@ class UltraFastBot:
             return
         client.start_task()
         try:
-            msg = await self.bot.send_message(user_id, f"{idx}. `phone` Sending...", parse_mode='Markdown')
+            msg = await self.bot.send_message(user_id, f"{idx}. `{phone}` Sending...", parse_mode='Markdown')
             self.message_ids[(user_id, phone)] = msg.message_id
             resp, rid = await self.send_instant(client, phone)
             status, emoji = self.parse_ultra_fast(resp)
             await self.bot.edit_message_text(
                 chat_id=user_id,
                 message_id=msg.message_id,
-                text=f"{idx}. `phone` {emoji} {status}",
+                text=f"{idx}. `{phone}` {emoji} {status}",
                 parse_mode='Markdown'
             )
             if rid and "waiting" not in status.lower():
@@ -250,7 +239,6 @@ class UltraFastBot:
             asyncio.create_task(self.process_number_ultra_fast(p, i, user_id))
             await asyncio.sleep(0.001)
 
-# ====================== COMMANDS ======================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     u = update.effective_user
     if is_allowed(u.id):
@@ -373,7 +361,6 @@ async def handle_message_ultra_fast(update: Update, context: ContextTypes.DEFAUL
     await update.message.reply_text(f"Found {len(nums)} numbers\nStarting Ultra Fast Check...")
     await bot.process_all_ultra_fast(nums, uid)
 
-# ====================== MAIN ======================
 async def main():
     TOKEN = "8224615707:AAGXnhaP2JMzf5JAVVW-NMedCZTym2_KuRE"
     bot = UltraFastBot(TOKEN)
@@ -399,7 +386,6 @@ async def main():
     while True:
         await asyncio.sleep(3600)
 
-# ====================== Flask for Render ======================
 from flask import Flask
 flask_app = Flask(__name__)
 
