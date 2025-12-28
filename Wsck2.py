@@ -386,61 +386,6 @@ async def main():
     while True:
         await asyncio.sleep(3600)
 
-# Wsck2 (3).py ফাইলের শেষে add করো:
-
-from flask import Flask, request, jsonify
-import threading
-
-# Create Flask app for API
-api_app = Flask(__name__)
-
-@api_app.route('/api/check-fresh', methods=['POST'])
-def check_fresh_api():
-    """API endpoint for fresh checking"""
-    try:
-        data = request.json
-        numbers = data.get('numbers', [])
-        
-        if not numbers or not isinstance(numbers, list):
-            return jsonify({"error": "Numbers array required"}), 400
-        
-        # Limit to 50 numbers
-        numbers = numbers[:50]
-        results = []
-        
-        # This function needs to be implemented
-        # You'll need to call your existing Wsck2 checking logic
-        for num in numbers:
-            # Simulate checking - replace with actual Wsck2 logic
-            result = check_single_number_ws2(num)  # You need to implement this
-            results.append({
-                "number": num,
-                "status": result["status"],
-                "category": result["category"]
-            })
-        
-        return jsonify({"success": True, "results": results})
-        
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@api_app.route('/api/health', methods=['GET'])
-def health_check():
-    return jsonify({
-        "status": "ok",
-        "clients": len(your_clients_list),  # Replace with actual
-        "timestamp": datetime.now().isoformat()
-    })
-
-# Run API in separate thread
-def run_api_server():
-    port = int(os.environ.get("API_PORT", 5001))
-    api_app.run(host='0.0.0.0', port=port, debug=False)
-
-# Start API server
-api_thread = threading.Thread(target=run_api_server, daemon=True)
-api_thread.start()
-print(f"🔌 Wsck2 API running on port 5001")
 
 
 from flask import Flask
