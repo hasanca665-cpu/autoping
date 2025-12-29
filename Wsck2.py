@@ -15,7 +15,22 @@ from telegram.ext import (
     filters, ContextTypes
 )
 
-# ====================== DATABASE ======================
+
+API_ID_1 = int(os.environ.get("API_ID_1", ""))
+API_HASH_1 = os.environ.get("API_HASH_1", "")
+SESSION_1 = os.environ.get("SESSION_1", "")
+
+API_ID_2 = int(os.environ.get("API_ID_2", ""))
+API_HASH_2 = os.environ.get("API_HASH_2", "")
+SESSION_2 = os.environ.get("SESSION_2", "")
+
+API_ID_3 = int(os.environ.get("API_ID_3", ""))
+API_HASH_3 = os.environ.get("API_HASH_3", "")
+SESSION_3 = os.environ.get("SESSION_3", "")
+
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
+ADMIN_ID = int(os.environ.get("ADMIN_ID", ""))
+
 DB_FILE = "user_db.json"
 
 def load_db():
@@ -29,8 +44,6 @@ def save_db():
         json.dump(DB, f, indent=4)
 
 DB = load_db()
-
-ADMIN_ID = 5624278091
 
 def is_allowed(user_id: int) -> bool:
     return user_id == ADMIN_ID or DB["users"].get(str(user_id), {}).get("allowed", False)
@@ -63,7 +76,6 @@ def log_check(user_id: int, count: int = 1):
     DB["stats"][uid]["total"] = DB["stats"][uid].get("total", 0) + count
     save_db()
 
-# ====================== ULTRA FAST BOT ======================
 class UltraFastClient:
     def __init__(self, api_id: int, api_hash: str, session_string: str, name: str):
         self.api_id = api_id
@@ -99,21 +111,30 @@ class UltraFastClient:
 class UltraFastBot:
     def __init__(self, bot_token: str):
         self.bot = Bot(bot_token)
-        self.clients = [
-            UltraFastClient(24742957, "40d421e05a414534910ebc0998f97c10",
-                "1BVtsOKwBu8SY0NXUwrafneFgpyXKdXQYZuceqXpABICi8whUhUB_EVnOqFDYSFFcm5d0HKJ3UnuMtSuVNd8V6uv31gi-3sfzKkpe5AipKV6vHVOM6wPMzCBE-feFuJ-f-rul1GpI390_rTB6KJVbWVti9teusIbyxmpoGHY727kwavTrSMcw_fY_1Uxn5D8a-IKnBHAthmsOKjCb0Wzt4xcoJjmMCaWEl5mn5zyJprv2GJL1Tgu1uG3CVoer17NQhZBWKtANrnTuTSftikQLpKdfYonSKUtihfbk-wsKKpkO8mXJ2dTXdDiy3sfIb0dsjJNP27pZ79JCR0RaxLFEoDYVWPVrESg=", "Client-1"),
-            
-            UltraFastClient(34028019, "fc5342423287695b08996481f2c01b76",
-                "1BVtsOKwBu4s8plZhOq40_z-LHs_LpTK2rhfqvjzY5yltX3IPGyryifv3OsPNQvjhKlB4cVezXvyvd7gJIRxZg-HIbys9zAv1TqYeDWpWC4mPqwQ5q5eAUAkmYBMVzvP15AdCVRtVSh6G6eHjvsDZZ7jFQ6CfNM1pgNMI_cJ3DwpeuvMVsZfFIykfL4ig-EtJDhrx_4hubQz-Jt7UWaKgLXRWM-GcVFSIB4VeG5pDb7AHb8LFOY2HI9Nb_o2N7sXCvch-8AdxcdoEhVRLjpkzeli5QAvOw3yYPho8JylMweYXKUnmKArIYTOFfYB7DnAG7p826CbfbyGJKsSwKW4VfUK3oMskETU=", "Client-2"),
-            
-            UltraFastClient(31262633, "bf9718993cfa858293a1afbbf2e20d3e",
-                "1BVtsOKwBu4tf3t5-EsbrQ3mcqegcuxr5HjkVSyjnufLbiwMau4GXx9aaIdaoxedW_sLKapg3mq6W8yQe23sc3hvKVdhxg4cLHCdZus_UUjOCMLx8Ecb_rH9JBaQBg5mCYDa_Y9ZvJUgbzuKYhzDJ8x5g_YyQOnjQW4WrwJ5O48Mu3LhOCwVvvfhxzjVmnv7mDFFNzVGoi4SStvaK3MgVOCkjF_jZF-MjGZlNU633C3ay2VVqoTF9OPO5hvzqB145VKv7IXIWvFaRgfoYO_CHEmRYMv_OMtIpRBFqXmGYCcMqu00fkErhsrRSMvRK2h2KmNUZ2fwSA_797am8eqZHr2B0k1T869g=", "Client-3"),
-        ]
+        self.clients = []
         self.message_ids = {}
         self.client_index = 0
+        
+        
+        sessions = [
+            (API_ID_1, API_HASH_1, SESSION_1, "Client-1"),
+            (API_ID_2, API_HASH_2, SESSION_2, "Client-2"),
+            (API_ID_3, API_HASH_3, SESSION_3, "Client-3")
+        ]
+        
+        for idx, (api_id, api_hash, session_str, name) in enumerate(sessions, 1):
+            if session_str and session_str.strip():  # শুধুমাত্র যদি session string থাকে
+                self.clients.append(UltraFastClient(api_id, api_hash, session_str, name))
+                print(f"Loaded {name}")
+            else:
+                print(f"Warning: {name} session string not found in environment variables")
     
     async def start_clients(self):
-        print("Starting all 3 clients with String Session...")
+        if not self.clients:
+            print("No clients available. Please set SESSION environment variables.")
+            return
+        
+        print(f"Starting {len(self.clients)} clients with String Session...")
         for client in self.clients:
             await client.connect()
             await asyncio.sleep(2)
@@ -135,6 +156,9 @@ class UltraFastBot:
         return [n for n in numbers if len(n)==10 and n not in seen and not seen.add(n)][:50]
 
     def get_next_client(self):
+        if not self.clients:
+            return None
+            
         for _ in range(len(self.clients)*2):
             c = self.clients[self.client_index]
             if c.can_accept_task():
@@ -156,21 +180,33 @@ class UltraFastBot:
             return str(e), None
 
     def parse_ultra_fast(self, resp: str):
-        if not resp: return "No Response", "⚠️"
-        t = resp.lower()
-        if any(x in t for x in ["already registered", "do not submit it again"]):
-            return "Already Checked, Ban", "⚠️"
-        if any(x in t for x in ["too many attempts", "try again later"]):
+        if not resp:
+            return "No Response", "⚠️"
+        
+        resp_lower = resp.lower()
+        
+        if "too many attempts for this number" in resp_lower:
             return "Fresh Num", "🟢"
-        if any(x in t for x in ["banned", "blocked", "registration blocked"]):
+        
+        if "already registered" in resp_lower or "do not submit it again" in resp_lower:
+            return "Already Checked", "⚠️"
+        
+        if "banned" in resp_lower or "blocked" in resp_lower:
             return "Banned", "🚫"
-        if any(x in t for x in ["otp verification code has been sent", "please enter the verification code", "6-digit code"]):
-            return "Ws Opened", "💩"   
-        if any(x in t for x in ["processing", "please wait", "in queue"]):
-            return "Processing...", "🔵"
-        if "successfully registered" in t or "account created" in t:
-            return "Fresh Registered", "Star"
-        return "Received", "Inbox"
+        
+        if "otp" in resp_lower or "verification code" in resp_lower or "6-digit" in resp_lower:
+            return "Ws Opened", "💩"
+        
+        if "processing" in resp_lower or "please wait" in resp_lower:
+            return "Processing", "🔵"
+        
+        if "successfully" in resp_lower or "account created" in resp_lower:
+            return "Registered", "⭐"
+        
+        if "try again later" in resp_lower:
+            return "Try Later", "🟡"
+        
+        return "Unknown", "📥"
 
     async def monitor_ultra_fast(self, client, msg_id, user_id, phone, idx):
         if not msg_id:
@@ -201,35 +237,39 @@ class UltraFastBot:
     async def process_number_ultra_fast(self, phone: str, idx: int, user_id: int):
         client = self.get_next_client()
         if not client:
+            await self.bot.send_message(user_id, "No active clients available.")
             return
         client.start_task()
         try:
-            msg = await self.bot.send_message(user_id, f"{idx}. `phone` Sending...", parse_mode='Markdown')
+            msg = await self.bot.send_message(user_id, f"{idx}. `{phone}` Sending...", parse_mode='Markdown')
             self.message_ids[(user_id, phone)] = msg.message_id
             resp, rid = await self.send_instant(client, phone)
             status, emoji = self.parse_ultra_fast(resp)
             await self.bot.edit_message_text(
                 chat_id=user_id,
                 message_id=msg.message_id,
-                text=f"{idx}. `phone` {emoji} {status}",
+                text=f"{idx}. `{phone}` {emoji} {status}",
                 parse_mode='Markdown'
             )
             if rid and "waiting" not in status.lower():
                 asyncio.create_task(self.monitor_ultra_fast(client, rid, user_id, phone, idx))
-        except:
-            pass
+        except Exception as e:
+            print(f"Error processing {phone}: {e}")
         finally:
             client.end_task()
 
     async def process_all_ultra_fast(self, nums: List[str], user_id: int):
         if not nums:
             return
+        if not self.clients:
+            await self.bot.send_message(user_id, "No Telegram clients available. Please check session strings.")
+            return
+            
         log_check(user_id, len(nums))
         for i, p in enumerate(nums, 1):
             asyncio.create_task(self.process_number_ultra_fast(p, i, user_id))
             await asyncio.sleep(0.001)
 
-# ====================== COMMANDS ======================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     u = update.effective_user
     if is_allowed(u.id):
@@ -352,13 +392,11 @@ async def handle_message_ultra_fast(update: Update, context: ContextTypes.DEFAUL
     await update.message.reply_text(f"Found {len(nums)} numbers\nStarting Ultra Fast Check...")
     await bot.process_all_ultra_fast(nums, uid)
 
-# ====================== MAIN ======================
 async def main():
-    TOKEN = "8224615707:AAGXnhaP2JMzf5JAVVW-NMedCZTym2_KuRE"
-    bot = UltraFastBot(TOKEN)
+    bot = UltraFastBot(BOT_TOKEN)
     await bot.start_clients()
     
-    app = Application.builder().token(TOKEN).build()
+    app = Application.builder().token(BOT_TOKEN).build()
     app.bot_data['bot'] = bot
 
     app.add_handler(CommandHandler("start", start))
@@ -378,7 +416,6 @@ async def main():
     while True:
         await asyncio.sleep(3600)
 
-# ====================== Flask for Render ======================
 from flask import Flask
 flask_app = Flask(__name__)
 
