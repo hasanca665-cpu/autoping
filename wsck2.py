@@ -28,6 +28,10 @@ API_ID_3 = int(os.environ.get("API_ID_3", ""))
 API_HASH_3 = os.environ.get("API_HASH_3", "")
 SESSION_3 = os.environ.get("SESSION_3", "")
 
+API_ID_4 = int(os.environ.get("API_ID_4", ""))
+API_HASH_4 = os.environ.get("API_HASH_4", "")
+SESSION_4 = os.environ.get("SESSION_4", "")
+
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
 ADMIN_ID = int(os.environ.get("ADMIN_ID", ""))
 
@@ -119,7 +123,8 @@ class UltraFastBot:
         sessions = [
             (API_ID_1, API_HASH_1, SESSION_1, "Client-1"),
             (API_ID_2, API_HASH_2, SESSION_2, "Client-2"),
-            (API_ID_3, API_HASH_3, SESSION_3, "Client-3")
+            (API_ID_3, API_HASH_3, SESSION_3, "Client-3"),
+            (API_ID_4, API_HASH_4, SESSION_4, "Client-4")
         ]
         
         for idx, (api_id, api_hash, session_str, name) in enumerate(sessions, 1):
@@ -289,7 +294,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     except:
         pass
-    await update.message.reply_text("Request sent to admin. Wait for approval.")
+    await update.message.reply_text("Request sent to admin @Notfound_errorx")
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
@@ -380,7 +385,7 @@ async def adminstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_message_ultra_fast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
     if not is_allowed(uid):
-        await update.message.reply_text("Access denied. Send /start")
+        await update.message.reply_text("Access denied. Send /start or contact Admin @Notfound_errorx")
         return
     text = update.message.text or ""
     bot = context.application.bot_data.get('bot')
