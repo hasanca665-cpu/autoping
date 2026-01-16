@@ -40,18 +40,13 @@ DB_FILE = "user_db.json"
 def load_db():
     if os.path.exists(DB_FILE):
         with open(DB_FILE, "r") as f:
-            return json.load(f)
-    return {"users": {}, "stats": {}}
-
-def load_db():
-    if os.path.exists(DB_FILE):
-        with open(DB_FILE, "r") as f:
             data = json.load(f)
             # পুরোনো ডাটা কম্প্যাটিবিলিটির জন্য
             if "stats" in data:
                 for uid, stats in data["stats"].items():
-                    if "total_checked" not in stats:
-                        stats["total_checked"] = stats.get("total", 0)
+                    if "total" not in stats:
+                        stats["total"] = 0
+                    # নতুন ফিল্ডগুলো যোগ করা
                     if "total_fresh" not in stats:
                         stats["total_fresh"] = 0
                     if "total_fresh_used" not in stats:
@@ -89,7 +84,7 @@ def set_user_allowed(user_id: int, allowed: bool):
         DB["users"][uid]["allowed"] = allowed
         save_db()
 
-def log_check(user_id: int, total_checked: int = 1, fresh_found: int = 0, fresh_used: int = 0):
+def log_check(user_id: int, count: int = 1, fresh_found: int = 0, fresh_used: int = 0):
     uid = str(user_id)
     today = datetime.now().strftime("%Y-%m-%d")
     
@@ -97,7 +92,6 @@ def log_check(user_id: int, total_checked: int = 1, fresh_found: int = 0, fresh_
         DB["stats"][uid] = {
             "daily": {},
             "total": 0,
-            "total_checked": 0,
             "total_fresh": 0,
             "total_fresh_used": 0,
             "fresh_daily": {},
@@ -105,17 +99,18 @@ def log_check(user_id: int, total_checked: int = 1, fresh_found: int = 0, fresh_
         }
     
     # মোট চেক সংখ্যা আপডেট
-    DB["stats"][uid]["daily"][today] = DB["stats"][uid]["daily"].get(today, 0) + total_checked
-    DB["stats"][uid]["total"] = DB["stats"][uid].get("total", 0) + total_checked
-    DB["stats"][uid]["total_checked"] = DB["stats"][uid].get("total_checked", 0) + total_checked
+    DB["stats"][uid]["daily"][today] = DB["stats"][uid]["daily"].get(today, 0) + count
+    DB["stats"][uid]["total"] = DB["stats"][uid].get("total", 0) + count
     
     # ফ্রেশ সংখ্যা আপডেট
-    DB["stats"][uid]["fresh_daily"][today] = DB["stats"][uid]["fresh_daily"].get(today, 0) + fresh_found
-    DB["stats"][uid]["total_fresh"] = DB["stats"][uid].get("total_fresh", 0) + fresh_found
+    if fresh_found > 0:
+        DB["stats"][uid]["fresh_daily"][today] = DB["stats"][uid]["fresh_daily"].get(today, 0) + fresh_found
+        DB["stats"][uid]["total_fresh"] = DB["stats"][uid].get("total_fresh", 0) + fresh_found
     
     # ব্যবহৃত ফ্রেশ সংখ্যা আপডেট
-    DB["stats"][uid]["fresh_used_daily"][today] = DB["stats"][uid]["fresh_used_daily"].get(today, 0) + fresh_used
-    DB["stats"][uid]["total_fresh_used"] = DB["stats"][uid].get("total_fresh_used", 0) + fresh_used
+    if fresh_used > 0:
+        DB["stats"][uid]["fresh_used_daily"][today] = DB["stats"][uid]["fresh_used_daily"].get(today, 0) + fresh_used
+        DB["stats"][uid]["total_fresh_used"] = DB["stats"][uid].get("total_fresh_used", 0) + fresh_used
     
     save_db()
 
@@ -157,7 +152,6 @@ class UltraFastBot:
         self.clients = []
         self.message_ids = {}
         self.client_index = 0
-        
         
         sessions = [
             (API_ID_1, API_HASH_1, SESSION_1, "Client-1"),
@@ -289,6 +283,14 @@ class UltraFastBot:
             self.message_ids[(user_id, phone)] = msg.message_id
             resp, rid = await self.send_instant(client, phone)
             status, emoji = self.parse_ultra_fast(resp)
+            
+            # ফ্রেশ নাম্বার ডিটেক্ট করা
+            fresh_found = 1 if status == "Fresh Num" else 0
+            fresh_used = 1 if status == "Fresh Num" else 0
+            
+            # লগ আপডেট
+            log_check(user_id, count=1, fresh_found=fresh_found, fresh_used=fresh_used)
+            
             await self.bot.edit_message_text(
                 chat_id=user_id,
                 message_id=msg.message_id,
@@ -309,7 +311,7 @@ class UltraFastBot:
             await self.bot.send_message(user_id, "No Telegram clients available. Please check session strings.")
             return
             
-        log_check(user_id, len(nums))
+        log_check(user_id, len(nums))  # শুধু মোট কাউন্ট আপডেট
         for i, p in enumerate(nums, 1):
             asyncio.create_task(self.process_number_ultra_fast(p, i, user_id))
             await asyncio.sleep(0.001)
@@ -404,9 +406,7 @@ async def adminstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     total_checked_all = 0
     total_fresh_all = 0
     total_fresh_used_all = 0
-    
-    today = datetime.now().strftime("%Y-%m-%d")
-    yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+    allowed_users = 0
     
     # প্রতিটি ইউজারের জন্য ডিটেইল্ড রিপোর্ট তৈরি
     reports = []
@@ -414,10 +414,14 @@ async def adminstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for uid, user_info in DB["users"].items():
         # ইউজার ইনফো
         user_id = uid
-        username = user_info.get("username", "")
+        username = user_info.get("username", "") or "no_username"
         first_name = user_info.get("first_name", "Unknown")
         status = "✅ Allowed" if user_info.get("allowed", False) else "⏳ Pending"
         registered = user_info.get("requested_at", "").split("T")[0] if user_info.get("requested_at") else "N/A"
+        
+        # অ্যালাউড ইউজার কাউন্ট
+        if user_info.get("allowed", False):
+            allowed_users += 1
         
         # স্ট্যাটস ইনফো
         user_stats = DB["stats"].get(uid, {})
@@ -426,17 +430,16 @@ async def adminstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         total_fresh_used = user_stats.get("total_fresh_used", 0)
         fresh_skipped = max(0, total_fresh - total_fresh_used)
         
-        # ডেইলি অ্যাক্টিভিটি
-        daily_stats = user_stats.get("daily", {})
-        fresh_daily = user_stats.get("fresh_daily", {})
-        fresh_used_daily = user_stats.get("fresh_used_daily", {})
-        
         # সামারি যোগ
         total_checked_all += total_checked
         total_fresh_all += total_fresh
         total_fresh_used_all += total_fresh_used
         
         # ডেইলি ব্রেকডাউন (শেষ ৩ দিন)
+        daily_stats = user_stats.get("daily", {})
+        fresh_daily = user_stats.get("fresh_daily", {})
+        fresh_used_daily = user_stats.get("fresh_used_daily", {})
+        
         daily_breakdown = []
         for i in range(3):
             date = (datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d")
@@ -444,12 +447,11 @@ async def adminstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
             fresh = fresh_daily.get(date, 0)
             fresh_used = fresh_used_daily.get(date, 0)
             
-            if checked > 0 or fresh > 0:
-                daily_breakdown.append(f"{date}: ✓{checked} | 🟢{fresh} | ✅{fresh_used}")
+            if checked > 0:
+                daily_breakdown.append(f"├── {date}: ✓{checked} | 🟢{fresh} | ✅{fresh_used}")
         
         # ইউজার রিপোর্ট তৈরি
-        user_report = f"""
-👤 **User:** {first_name} (@{username if username else 'no_username'})
+        user_report = f"""👤 **User:** {first_name} (@{username})
 🆔 **ID:** {user_id}
 📅 **Registered:** {registered}
 ✅ **Status:** {status}
@@ -465,43 +467,57 @@ async def adminstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # ডেইলি অ্যাক্টিভিটি যোগ
         if daily_breakdown:
             user_report += "📅 **Recent Activity:**\n"
-            for day in daily_breakdown:
-                user_report += f"├── {day}\n"
-            user_report += "└──\n"
+            user_report += "\n".join(daily_breakdown)
+            user_report += "\n└──\n"
         
-        user_report += "─" * 40
+        user_report += "─" * 35 + "\n"
         reports.append(user_report)
     
     # সিস্টেম সামারি
     utilization_rate = (total_fresh_used_all / total_fresh_all * 100) if total_fresh_all > 0 else 0
-    avg_fresh_per_user = total_fresh_all / total_users if total_users > 0 else 0
+    avg_fresh_per_user = total_fresh_all / allowed_users if allowed_users > 0 else 0
     
-    system_summary = f"""
-📈 **SYSTEM SUMMARY:**
-• Total Users: {total_users}
+    system_summary = f"""📈 **SYSTEM SUMMARY:**
+• Total Users: {total_users} (✅ {allowed_users} allowed, ⏳ {total_users - allowed_users} pending)
 • Total Numbers Checked: {total_checked_all}
 • Total Fresh Found: {total_fresh_all}
 • Total Fresh Used: {total_fresh_used_all}
+• Fresh Skipped: {total_fresh_all - total_fresh_used_all}
 • Fresh Utilization Rate: {utilization_rate:.1f}%
-• Avg Fresh per User: {avg_fresh_per_user:.1f}
+• Avg Fresh per Active User: {avg_fresh_per_user:.1f}
 """
     
     # সব রিপোর্ট একত্রিত করা
     final_report = "📊 **ADMIN STATS - Detailed Report**\n"
-    final_report += "─" * 40 + "\n\n"
+    final_report += "─" * 35 + "\n\n"
     
+    # শুধু অ্যালাউড ইউজারদের দেখাবে যাদের অ্যাক্টিভিটি আছে
+    active_reports = []
     for report in reports:
-        final_report += report + "\n"
+        lines = report.split('\n')
+        for line in lines:
+            if "Total Checked:" in line:
+                checked_num = int(line.split(":")[1].strip())
+                if checked_num > 0:
+                    active_reports.append(report)
+                break
+    
+    if not active_reports:
+        active_reports = reports  # সবাইকে দেখাবে যদি কেউ অ্যাক্টিভ না থাকে
+    
+    for report in active_reports:
+        final_report += report
     
     final_report += "\n" + system_summary
     
     # টেলিগ্রাম মেসেজ লিমিট (4096 characters)
     if len(final_report) > 4000:
-        # প্রথম অংশ
-        await update.message.reply_text(final_report[:4000], parse_mode='Markdown')
-        # দ্বিতীয় অংশ (যদি থাকে)
-        if len(final_report) > 4000:
-            await update.message.reply_text(final_report[4000:], parse_mode='Markdown')
+        parts = [final_report[i:i+4000] for i in range(0, len(final_report), 4000)]
+        for i, part in enumerate(parts):
+            if i == 0:
+                await update.message.reply_text(part, parse_mode='Markdown')
+            else:
+                await update.message.reply_text(part, parse_mode='Markdown')
     else:
         await update.message.reply_text(final_report, parse_mode='Markdown')
 
