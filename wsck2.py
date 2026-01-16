@@ -265,7 +265,7 @@ class UltraFastBot:
                                     chat_id=user_id,
                                     message_id=self.message_ids[k],
                                     text=f"{idx}. `{phone}` {ne} {ns}",
-                                    parse_mode='Markdown'
+                                    parse_mode='none'
                                 )
                             except:
                                 pass
@@ -279,7 +279,7 @@ class UltraFastBot:
             return
         client.start_task()
         try:
-            msg = await self.bot.send_message(user_id, f"{idx}. `{phone}` Sending...", parse_mode='Markdown')
+            msg = await self.bot.send_message(user_id, f"{idx}. `{phone}` Sending...", parse_mode='none')
             self.message_ids[(user_id, phone)] = msg.message_id
             resp, rid = await self.send_instant(client, phone)
             status, emoji = self.parse_ultra_fast(resp)
@@ -295,7 +295,7 @@ class UltraFastBot:
                 chat_id=user_id,
                 message_id=msg.message_id,
                 text=f"{idx}. `{phone}` {emoji} {status}",
-                parse_mode='Markdown'
+                parse_mode='none'
             )
             if rid and "waiting" not in status.lower():
                 asyncio.create_task(self.monitor_ultra_fast(client, rid, user_id, phone, idx))
@@ -515,11 +515,11 @@ async def adminstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parts = [final_report[i:i+4000] for i in range(0, len(final_report), 4000)]
         for i, part in enumerate(parts):
             if i == 0:
-                await update.message.reply_text(part, parse_mode='Markdown')
+                await update.message.reply_text(part, parse_mode='none')
             else:
-                await update.message.reply_text(part, parse_mode='Markdown')
+                await update.message.reply_text(part, parse_mode='none')
     else:
-        await update.message.reply_text(final_report, parse_mode='Markdown')
+        await update.message.reply_text(final_report, parse_mode='none')
 
 async def handle_message_ultra_fast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
