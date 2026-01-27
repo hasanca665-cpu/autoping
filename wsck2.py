@@ -839,16 +839,16 @@ async def adminstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         if total_checked > 0:
             user_report = f"""
-👤 **USER:** {first_name} (@{username})
-🆔 **ID:** `{uid}`
-📅 **Registered:** {registered}
-🔐 **Status:** {status}
+👤 USER: {first_name} (@{username})
+🆔 ID: {uid}
+📅 Registered: {registered}
+🔐 Status: {status}
 
-📊 **STATS:**
-Checked: `{total_checked}`
-Fresh Found: `{total_fresh_found}`
-Fresh Used: `{total_fresh_used}`
-Fresh Skipped: `{fresh_skipped}`
+📊 STATS:
+Checked: {total_checked}
+Fresh Found: {total_fresh_found}
+Fresh Used: {total_fresh_used}
+Fresh Skipped: {fresh_skipped}
 """
             
             today = datetime.now().strftime("%Y-%m-%d")
@@ -867,11 +867,11 @@ Fresh Skipped: `{fresh_skipped}`
             used_yesterday = fresh_used_daily.get(yesterday, 0)
             
             if activity_today > 0 or activity_yesterday > 0:
-                user_report += f"\n📈 **ACTIVITY:**\n"
+                user_report += f"\n📈 ACTIVITY:\n"
                 if activity_today > 0:
-                    user_report += f"Today: Checked `{activity_today}`, Fresh `{fresh_today}`, Used `{used_today}`\n"
+                    user_report += f"Today: Checked {activity_today}, Fresh {fresh_today}, Used {used_today}\n"
                 if activity_yesterday > 0:
-                    user_report += f"Yesterday: Checked `{activity_yesterday}`, Fresh `{fresh_yesterday}`, Used `{used_yesterday}`\n"
+                    user_report += f"Yesterday: Checked {activity_yesterday}, Fresh {fresh_yesterday}, Used {used_yesterday}\n"
             
             user_report += "-" * 50 + "\n"
             reports.append(user_report)
@@ -879,21 +879,21 @@ Fresh Skipped: `{fresh_skipped}`
     utilization_rate = (total_fresh_used_all / total_fresh_found_all * 100) if total_fresh_found_all > 0 else 0
     
     system_summary = f"""
-📊 **SYSTEM SUMMARY**
+📊 SYSTEM SUMMARY
 {'='*50}
-👥 **Total Users:** `{total_users}`
-⚡ **Active Users:** `{active_users}`
-✅ **Allowed Users:** `{allowed_users}`
+👥 Total Users: {total_users}
+⚡ Active Users: {active_users}
+✅ Allowed Users: {allowed_users}
 
-🔢 **Total Numbers Checked:** `{total_checked_all}`
-🟢 **Total Fresh Found:** `{total_fresh_found_all}`
-⭐ **Total Fresh Used:** `{total_fresh_used_all}`
-📭 **Total Fresh Skipped:** `{total_fresh_found_all - total_fresh_used_all}`
-📈 **Fresh Utilization Rate:** `{utilization_rate:.1f}%`
+🔢 Total Numbers Checked: {total_checked_all}
+🟢 Total Fresh Found: {total_fresh_found_all}
+⭐ Total Fresh Used: {total_fresh_used_all}
+📭 Total Fresh Skipped: {total_fresh_found_all - total_fresh_used_all}
+📈 Fresh Utilization Rate: {utilization_rate:.1f}%
 """
     
     if reports:
-        final_report = "📊 **ADMIN STATS REPORT**\n"
+        final_report = "📊 ADMIN STATS REPORT\n"
         final_report += "=" * 50 + "\n\n"
         final_report += "\n".join(reports)
         final_report += system_summary
