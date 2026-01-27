@@ -776,7 +776,7 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def send_large_message(chat_id: int, text: str, bot: Bot):
     """Split and send large messages automatically"""
     if len(text) <= 4000:
-        await bot.send_message(chat_id, text, parse_mode='Markdown')
+        await bot.send_message(chat_id, text, parse_mode='none')
         return
     
     sections = []
@@ -794,7 +794,7 @@ async def send_large_message(chat_id: int, text: str, bot: Bot):
     
     for i, section in enumerate(sections, 1):
         header = f"**Part {i}/{len(sections)}**\n\n" if len(sections) > 1 else ""
-        await bot.send_message(chat_id, header + section, parse_mode='Markdown')
+        await bot.send_message(chat_id, header + section, parse_mode='none')
         await asyncio.sleep(0.3)
 
 async def adminstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
