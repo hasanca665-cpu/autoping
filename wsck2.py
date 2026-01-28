@@ -130,7 +130,6 @@ def log_check(user_id: int, total_checked: int = 1, fresh_found_in_msg: int = 0,
     
     stats = DB["stats"][uid]
     
-    # Update daily stats
     stats["daily"][today] = stats["daily"].get(today, 0) + total_checked
     stats["total"] = stats.get("total", 0) + total_checked
     
@@ -141,6 +140,11 @@ def log_check(user_id: int, total_checked: int = 1, fresh_found_in_msg: int = 0,
     stats["total_fresh_used"] = stats.get("total_fresh_used", 0) + fresh_used_in_msg
     
     save_db()
+
+def escape_markdown_v2(text: str) -> str:
+    """Escape reserved MarkdownV2 characters except inside code blocks"""
+    reserved = r'_*[]()~`>#+-=|{}.!'
+    return ''.join(['\\' + c if c in reserved else c for c in text])
 
 class UltraFastClient:
     def __init__(self, api_id: int, api_hash: str, session_string: str, name: str):
@@ -209,51 +213,46 @@ class UltraFastBot:
             await asyncio.sleep(0.5)
 
     def extract_all_numbers(self, text: str) -> List[str]:
-        """Extract phone numbers from text - IMPROVED VERSION"""
-        # Remove all non-digit characters except dashes and dots
-        cleaned_text = text.replace('-', '').replace('.', '').replace(' ', '')
-        
-        # Pattern to match 10-digit numbers (3069921959 format)
+        no_space = re.sub(r'\s+', '', text)
         numbers = []
         
-        # Find all sequences of exactly 10 digits
-        matches = re.findall(r'\d{10}', cleaned_text)
-        for match in matches:
-            if len(match) == 10:
-                numbers.append(match)
+        numbers.extend(re.findall(r'\d{10}', no_space))
         
-        # Also handle formatted numbers like 306-992-1959
-        formatted_matches = re.findall(r'\d{3}[-\.]?\d{3}[-\.]?\d{4}', text)
-        for match in formatted_matches:
-            # Remove all non-digit characters
+        formatted = re.findall(r'\d{3}[-\.\s]?\d{3}[-\.\s]?\d{4}', text)
+        for match in formatted:
             digits = re.sub(r'\D', '', match)
             if len(digits) == 10:
                 numbers.append(digits)
-            elif len(digits) == 11 and digits[0] == '1':
+            elif len(digits) == 11 and digits.startswith('1'):
                 numbers.append(digits[1:])
         
-        # Handle 11-digit numbers starting with 1
-        eleven_digit_matches = re.findall(r'1\d{10}', cleaned_text)
-        for match in eleven_digit_matches:
-            if len(match) == 11 and match[0] == '1':
-                numbers.append(match[1:])
+        parenthesis = re.findall(r'\(\d{3}\)\s*\d{3}[-\s]?\d{4}', text)
+        for match in parenthesis:
+            digits = re.sub(r'\D', '', match)
+            if len(digits) == 10:
+                numbers.append(digits)
         
-        # Remove duplicates while preserving order
+        us_prefix = re.findall(r'1[-\s(]?\d{3}[-\s)]?\d{3}[-\s]?\d{4}', text)
+        for match in us_prefix:
+            digits = re.sub(r'\D', '', match)
+            if len(digits) == 11 and digits.startswith('1'):
+                numbers.append(digits[1:])
+            elif len(digits) == 10:
+                numbers.append(digits)
+        
         seen = set()
-        unique_numbers = []
+        unique = []
         for n in numbers:
-            if n not in seen:
+            if n not in seen and len(n) == 10:
                 seen.add(n)
-                unique_numbers.append(n)
+                unique.append(n)
         
-        return unique_numbers[:100]
+        return unique[:100]
 
     def get_next_client(self):
-        """Get next available client with load balancing"""
         if not self.clients:
             return None
         
-        # Try to find available client quickly
         for _ in range(len(self.clients) * 2):
             c = self.clients[self.client_index]
             if c.can_accept_task():
@@ -261,30 +260,26 @@ class UltraFastBot:
                 return c
             self.client_index = (self.client_index + 1) % len(self.clients)
         
-        # If all busy, return least busy
         return min(self.clients, key=lambda x: x.active_tasks) if self.clients else None
 
     async def send_instant(self, client: UltraFastClient, phone: str) -> Tuple[str, int]:
-        """Send number to sellws bot with ultra-fast response"""
         try:
-            # Send with minimal delay
-            await client.client.send_message('@Sellws_bot', f"+1{phone}")
-            
-            # Reduced wait time for response
-            await asyncio.sleep(1.5)
-            
-            # Get response quickly with minimal messages
-            msgs = await client.client.get_messages('@Sellws_bot', limit=15)
-            for m in msgs:
+            sent = await client.client.send_message('@Sellws_bot', f"+1{phone}")
+            await asyncio.sleep(0.8)
+            msgs = await client.client.get_messages('@Sellws_bot', limit=10, min_id=sent.id - 5)
+            for m in reversed(msgs):
                 if not m.out and (phone in m.message or f"+1{phone}" in m.message):
                     return m.message, m.id
             return None, None
+        except FloodWaitError as e:
+            print(f"Flood wait for {phone}: {e.seconds}s")
+            await asyncio.sleep(e.seconds + 5)
+            return await self.send_instant(client, phone)
         except Exception as e:
-            print(f"Send error: {e}")
+            print(f"Send error {phone}: {e}")
             return str(e), None
 
     def parse_ultra_fast(self, resp: str) -> Tuple[str, str]:
-        """Parse sellws bot response instantly"""
         if not resp:
             return "No Response", "⚠️"
         
@@ -292,51 +287,38 @@ class UltraFastBot:
         
         if "too many attempts for this number" in resp_lower:
             return "Fresh Num", "🟢"
-        
         if "already registered" in resp_lower or "do not submit it again" in resp_lower:
             return "Already Checked", "⚠️"
-        
         if "banned" in resp_lower or "blocked" in resp_lower:
             return "Banned", "🚫"
-        
         if "otp" in resp_lower or "verification code" in resp_lower or "6-digit" in resp_lower:
             return "Ws Opened", "💩"
-        
         if "processing" in resp_lower or "please wait" in resp_lower:
             return "Processing", "🔵"
-        
         if "successfully" in resp_lower or "account created" in resp_lower:
             return "Registered", "⭐"
-        
         if "try again later" in resp_lower:
             return "Try Later", "🟡"
         
         return "Unknown", "📥"
 
     async def send_status_message(self, chat_id: int, phone: str, idx: int, status: str, emoji: str):
-        """Send status message - ALWAYS use code blocks to prevent copying"""
-        # ALWAYS use code blocks to prevent copying - no exception for Processing
-        message = f"`{idx}. {phone}` {emoji} {status}"
+        idx_str = escape_markdown_v2(f"{idx}.")
+        status_str = escape_markdown_v2(status)
+        message = f"{idx_str} `{phone}` {emoji} {status_str}"
         try:
             msg = await self.bot.send_message(chat_id, message, parse_mode='MarkdownV2')
             return msg.message_id
         except Exception as e:
-            # If MarkdownV2 fails, try with plain text with special characters
-            try:
-                # Use special characters to make copying difficult
-                protected_phone = f"❯ {phone} ❮"
-                message = f"{idx}. {protected_phone} {emoji} {status}"
-                msg = await self.bot.send_message(chat_id, message)
-                return msg.message_id
-            except:
-                # Last resort - plain message
-                msg = await self.bot.send_message(chat_id, f"{idx}. {phone} {emoji} {status}")
-                return msg.message_id
+            print("MarkdownV2 send failed:", e)
+            plain = f"{idx}. {phone} {emoji} {status}"
+            msg = await self.bot.send_message(chat_id, plain)
+            return msg.message_id
 
     async def edit_status_message(self, chat_id: int, message_id: int, phone: str, idx: int, status: str, emoji: str):
-        """Edit status message - ALWAYS use code blocks"""
-        # ALWAYS use code blocks to prevent copying
-        message = f"`{idx}. {phone}` {emoji} {status}"
+        idx_str = escape_markdown_v2(f"{idx}.")
+        status_str = escape_markdown_v2(status)
+        message = f"{idx_str} `{phone}` {emoji} {status_str}"
         try:
             await self.bot.edit_message_text(
                 chat_id=chat_id,
@@ -345,42 +327,26 @@ class UltraFastBot:
                 parse_mode='MarkdownV2'
             )
         except Exception as e:
-            # If MarkdownV2 fails, try with plain text with special characters
+            print("MarkdownV2 edit failed:", e)
             try:
-                protected_phone = f"❯ {phone} ❮"
-                message = f"{idx}. {protected_phone} {emoji} {status}"
+                plain = f"{idx}. {phone} {emoji} {status}"
                 await self.bot.edit_message_text(
                     chat_id=chat_id,
                     message_id=message_id,
-                    text=message
+                    text=plain
                 )
             except:
-                try:
-                    # Try without any formatting
-                    await self.bot.edit_message_text(
-                        chat_id=chat_id,
-                        message_id=message_id,
-                        text=f"{idx}. {phone} {emoji} {status}"
-                    )
-                except:
-                    # If all fails, just ignore
-                    pass
+                pass
 
     async def monitor_ultra_fast(self, client: UltraFastClient, msg_id: int, user_id: int, 
                                  phone: str, idx: int, final_statuses: Dict, start_msg_id: int):
-        """Monitor status updates with proper status change detection"""
         if not msg_id:
             return
         
         cur_status = "Sending"
-        last_status = None
         
-        # Track all status changes
-        status_history = []
-        
-        # Fast monitoring - check every 500ms for 30 seconds
-        for _ in range(60):  # 60 * 0.5 = 30 seconds
-            await asyncio.sleep(0.5)  # Check every 500ms
+        for _ in range(50):  # reduced loops
+            await asyncio.sleep(0.4)  # faster polling
             
             try:
                 m = await client.client.get_messages('@Sellws_bot', ids=msg_id)
@@ -388,72 +354,27 @@ class UltraFastBot:
                     new_status, emoji = self.parse_ultra_fast(m.message)
                     
                     if new_status != cur_status:
-                        status_history.append((datetime.now(), new_status))
                         cur_status = new_status
-                        
-                        # Update message with code blocks
                         await self.edit_status_message(user_id, start_msg_id, phone, idx, cur_status, emoji)
                         
-                        # Update final status
                         final_statuses[phone] = {
                             "status": cur_status,
                             "emoji": emoji,
                             "is_fresh": (cur_status == "Fresh Num"),
-                            "updated_at": datetime.now().isoformat(),
-                            "history": status_history
+                            "updated_at": datetime.now().isoformat()
                         }
                         
-                        # If we get a final status, wait a bit and break
                         if cur_status not in ["Processing", "Sending", "Unknown"]:
-                            # Wait 3 seconds for final confirmation
-                            await asyncio.sleep(3)
-                            
-                            # Final check
-                            try:
-                                m_final = await client.client.get_messages('@Sellws_bot', ids=msg_id)
-                                if m_final and m_final.message:
-                                    final_check, final_emoji = self.parse_ultra_fast(m_final.message)
-                                    if final_check != cur_status:
-                                        status_history.append((datetime.now(), final_check))
-                                        cur_status = final_check
-                                        final_statuses[phone] = {
-                                            "status": cur_status,
-                                            "emoji": final_emoji,
-                                            "is_fresh": (cur_status == "Fresh Num"),
-                                            "updated_at": datetime.now().isoformat(),
-                                            "history": status_history
-                                        }
-                                        
-                                        # Final update
-                                        await self.edit_status_message(user_id, start_msg_id, phone, idx, cur_status, final_emoji)
-                            except:
-                                pass
+                            await asyncio.sleep(2.5)
                             break
-                else:
-                    # If message not found, check if we have response
-                    if cur_status == "Sending":
-                        cur_status = "No Response"
-                        await self.edit_status_message(user_id, start_msg_id, phone, idx, cur_status, "📭")
-                        final_statuses[phone] = {
-                            "status": cur_status,
-                            "emoji": "📭",
-                            "is_fresh": False,
-                            "updated_at": datetime.now().isoformat(),
-                            "history": status_history
-                        }
-                        break
-                        
-            except Exception as e:
-                print(f"Monitor error for {phone}: {e}")
+            except:
                 break
         
-        # Cache final status
         if phone in final_statuses:
             self.number_status_cache[phone] = final_statuses[phone]
 
     async def process_single_number(self, phone: str, idx: int, user_id: int, 
                                    final_statuses: Dict, semaphore: asyncio.Semaphore) -> Tuple[bool, str]:
-        """Process a single number with improved status tracking"""
         async with semaphore:
             client = self.get_next_client()
             if not client:
@@ -461,52 +382,44 @@ class UltraFastBot:
             
             client.start_task()
             try:
-                # Send initial message with code blocks
                 msg_id = await self.send_status_message(user_id, phone, idx, "Sending", "📤")
+                if not msg_id:
+                    return False, "Send failed"
+                
                 self.message_ids[(user_id, phone)] = msg_id
                 
-                # Send and get initial response
                 resp, resp_id = await self.send_instant(client, phone)
                 initial_status, emoji = self.parse_ultra_fast(resp)
                 
-                # Immediate update with code blocks
                 await self.edit_status_message(user_id, msg_id, phone, idx, initial_status, emoji)
                 
-                # Store initial status
                 final_statuses[phone] = {
                     "status": initial_status,
                     "emoji": emoji,
                     "is_fresh": (initial_status == "Fresh Num"),
-                    "updated_at": datetime.now().isoformat(),
-                    "history": [(datetime.now(), initial_status)]
+                    "updated_at": datetime.now().isoformat()
                 }
                 
-                # Start background monitoring
                 if resp_id:
                     asyncio.create_task(
                         self.monitor_ultra_fast(client, resp_id, user_id, phone, idx, final_statuses, msg_id)
                     )
                 
-                # Wait for final status (15 seconds)
-                await asyncio.sleep(20)
+                await asyncio.sleep(12)  # reduced from 20s
                 
-                # Check final status after 15 seconds
                 if phone in final_statuses:
-                    status_info = final_statuses[phone]
-                    is_fresh = status_info["is_fresh"]
-                    final_status = status_info["status"]
-                    
-                    # Ensure final update with code blocks
-                    await self.edit_status_message(user_id, msg_id, phone, idx, final_status, status_info['emoji'])
-                    
-                    return is_fresh, final_status
+                    info = final_statuses[phone]
+                    await self.edit_status_message(user_id, msg_id, phone, idx, info["status"], info["emoji"])
+                    return info["is_fresh"], info["status"]
                 
-                # If still processing, return current status
                 return (initial_status == "Fresh Num"), initial_status
                 
+            except FloodWaitError as e:
+                print(f"Flood in processing {phone}: waiting {e.seconds}s")
+                await asyncio.sleep(e.seconds + 3)
+                return False, "Flood Wait"
             except Exception as e:
-                print(f"Process error for {phone}: {e}")
-                # Send error status
+                print(f"Process error {phone}: {e}")
                 try:
                     await self.edit_status_message(user_id, msg_id, phone, idx, "Error", "❌")
                 except:
@@ -516,7 +429,6 @@ class UltraFastBot:
                 client.end_task()
 
     async def process_all_ultra_fast(self, nums: List[str], user_id: int):
-        """Process all numbers with improved status tracking"""
         if not nums:
             return
         
@@ -527,51 +439,44 @@ class UltraFastBot:
         message_track_id = f"{user_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
         final_statuses = {}
         
-        # Send initial message
         initial_msg = await self.bot.send_message(
             user_id,
             f"⚡ Checking `{len(nums)}` numbers...",
             parse_mode='Markdown'
         )
         
-        # Create semaphore for parallel processing
-        semaphore = asyncio.Semaphore(min(30, len(nums)))
+        semaphore = asyncio.Semaphore(min(40, len(nums)))  # increased concurrency
         
-        # Create all tasks
         tasks = []
         for i, phone in enumerate(nums, 1):
             task = asyncio.create_task(
                 self.process_single_number(phone, i, user_id, final_statuses, semaphore)
             )
             tasks.append((phone, task))
-            await asyncio.sleep(0.05)
+            await asyncio.sleep(0.03)  # faster task creation
         
-        # Wait for all tasks to complete
         results = []
         for phone, task in tasks:
             try:
-                is_fresh, status = await asyncio.wait_for(task, timeout=20)
+                is_fresh, status = await asyncio.wait_for(task, timeout=18)
                 results.append((phone, is_fresh, status))
             except asyncio.TimeoutError:
                 if phone in self.number_status_cache:
-                    status_info = self.number_status_cache[phone]
-                    results.append((phone, status_info["is_fresh"], status_info["status"]))
+                    si = self.number_status_cache[phone]
+                    results.append((phone, si["is_fresh"], si["status"]))
                 else:
                     results.append((phone, False, "Timeout"))
-            except Exception as e:
-                results.append((phone, False, f"Error"))
+            except:
+                results.append((phone, False, "Error"))
         
-        # Delete the initial message
         try:
             await self.bot.delete_message(user_id, initial_msg.message_id)
         except:
             pass
         
-        # Calculate fresh counts
         fresh_found = sum(1 for _, is_fresh, _ in results if is_fresh)
         fresh_used = min(1, fresh_found)
         
-        # Update tracking
         if message_track_id not in FRESH_TRACK["message_tracking"]:
             FRESH_TRACK["message_tracking"][message_track_id] = {
                 "user_id": user_id,
@@ -605,7 +510,6 @@ class UltraFastBot:
                     "used": used
                 }
         
-        # Update stats
         log_check(user_id,
                  total_checked=len(nums),
                  fresh_found_in_msg=sum(1 for _, is_fresh, _ in results if is_fresh),
@@ -613,11 +517,8 @@ class UltraFastBot:
         
         save_fresh_track()
         
-        
-        
-        # Group by status
         status_counts = {}
-        for phone, is_fresh, status in results:
+        for _, _, status in results:
             status_counts[status] = status_counts.get(status, 0) + 1
         
         status_emojis = {
@@ -630,36 +531,24 @@ class UltraFastBot:
             "Already Checked": "⚠️",
             "No Response": "📭",
             "Unknown": "❓",
-            "Sending": "📤",
             "Error": "❌",
             "Timeout": "⏱️"
         }
         
-        for status, count in sorted(status_counts.items()):
-            emoji = status_emojis.get(status, "📊")
-            report_msg += f"{emoji} {status}: `{count}`\n"
         
-        # Add individual numbers (protected with code blocks)
-        report_msg += "\n🔢 **Individual Results:**\n```\n"
-        for phone, is_fresh, status in results:
-            emoji = status_emojis.get(status, "📊")
-            report_msg += f"{phone}: {emoji} {status}\n"
-        report_msg += "```"
         
-        # Send final report
-        await self.bot.send_message(
-            user_id,
-            report_msg,
-            parse_mode='Markdown'
-        )
+        await self.bot.send_message(user_id, report_msg)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     u = update.effective_user
     if is_allowed(u.id):
         await update.message.reply_text(
-            "⚡ Welcome back! Send numbers to check instantly.\n\n"
-            "📝 Format numbers in code blocks for better parsing:\n"
-            "```\n1234567890\n9876543210\n```",
+            "⚡ Welcome back! Send numbers to check.\n\n"
+            "Examples that work:\n"
+            "3069921959\n"
+            "(306) 992-1959\n"
+            "(306)9921959\n"
+            "1-306-992-1959",
             parse_mode='Markdown'
         )
         return
@@ -774,28 +663,25 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(response, parse_mode='Markdown')
 
 async def send_large_message(chat_id: int, text: str, bot: Bot):
-    """Split and send large messages automatically"""
     if len(text) <= 4000:
-        await bot.send_message(chat_id, text, parse_mode='none')
+        await bot.send_message(chat_id, text)
         return
     
     sections = []
-    current_section = ""
-    
+    current = ""
     for line in text.split('\n'):
-        if len(current_section) + len(line) + 1 < 4000:
-            current_section += line + '\n'
+        if len(current) + len(line) + 1 < 3900:
+            current += line + '\n'
         else:
-            sections.append(current_section)
-            current_section = line + '\n'
+            sections.append(current)
+            current = line + '\n'
+    if current:
+        sections.append(current)
     
-    if current_section:
-        sections.append(current_section)
-    
-    for i, section in enumerate(sections, 1):
+    for i, sec in enumerate(sections, 1):
         header = f"**Part {i}/{len(sections)}**\n\n" if len(sections) > 1 else ""
-        await bot.send_message(chat_id, header + section, parse_mode='none')
-        await asyncio.sleep(0.3)
+        await bot.send_message(chat_id, header + sec)
+        await asyncio.sleep(0.4)
 
 async def adminstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
@@ -916,23 +802,17 @@ async def handle_message_ultra_fast(update: Update, context: ContextTypes.DEFAUL
     
     nums = bot.extract_all_numbers(text)
     if not nums:
-        await update.message.reply_text("📭 No valid numbers found. Send numbers like:\n\n```\n1234567890\n9876543210\n```",
-                                       parse_mode='Markdown')
+        await update.message.reply_text("📭 No valid 10-digit numbers found.\n\nExamples:\n3069921959\n(306) 992-1959\n(306)9921959\n1-306-992-1959")
         return
     
-    # Process in background WITHOUT sending processing message
     asyncio.create_task(bot.process_all_ultra_fast(nums, uid))
 
 async def send_daily_stats():
-    """Send daily stats update at 4 PM Bangladesh time"""
     try:
-        bangladesh_time = datetime.utcnow() + timedelta(hours=6)
+        now_bd = datetime.utcnow() + timedelta(hours=6)
         
-        if bangladesh_time.hour == 16 and bangladesh_time.minute == 0:
-            today = datetime.now().strftime("%Y-%m-%d")
-            yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
-            
-            stats_msg = f"📊 **Daily Stats Update - {today}**\n\n"
+        if now_bd.hour == 16 and now_bd.minute <= 5:
+            today = now_bd.strftime("%Y-%m-%d")
             
             daily_checked = 0
             daily_fresh_found = 0
@@ -943,27 +823,27 @@ async def send_daily_stats():
                 daily_fresh_found += user_stats.get("fresh_found_daily", {}).get(today, 0)
                 daily_fresh_used += user_stats.get("fresh_used_daily", {}).get(today, 0)
             
-            stats_msg += f"📅 **Today's Summary:**\n"
-            stats_msg += f"Numbers Checked: `{daily_checked}`\n"
-            stats_msg += f"Fresh Found: `{daily_fresh_found}`\n"
-            stats_msg += f"Fresh Used: `{daily_fresh_used}`\n"
-            stats_msg += f"Fresh Skipped: `{max(0, daily_fresh_found - daily_fresh_used)}`\n\n"
+            stats_msg = f"📊 **Daily Activity Report – {today}** (4:00 PM BD)\n\n"
+            stats_msg += f"Numbers Checked  : {daily_checked}\n"
+            stats_msg += f"Fresh Found      : {daily_fresh_found}\n"
+            stats_msg += f"Fresh Used       : {daily_fresh_used}\n"
+            stats_msg += f"Fresh Skipped    : {max(0, daily_fresh_found - daily_fresh_used)}\n"
             
             DAILY_STATS[today] = {
                 "checked": daily_checked,
                 "fresh_found": daily_fresh_found,
                 "fresh_used": daily_fresh_used,
-                "timestamp": datetime.now().isoformat()
+                "timestamp": now_bd.isoformat()
             }
             save_daily_stats()
             
-            bot = UltraFastBot(BOT_TOKEN)
-            await bot.bot.send_message(ADMIN_ID, stats_msg, parse_mode='Markdown')
+            bot_instance = UltraFastBot(BOT_TOKEN)
+            await bot_instance.bot.send_message(ADMIN_ID, stats_msg)
             
-            print(f"Daily stats sent at {bangladesh_time}")
+            print(f"Daily stats sent at BD time: {now_bd.strftime('%H:%M:%S')}")
     
     except Exception as e:
-        print(f"Error sending daily stats: {e}")
+        print(f"Daily stats error: {e}")
 
 async def main():
     bot = UltraFastBot(BOT_TOKEN)
@@ -984,8 +864,8 @@ async def main():
     app.add_handler(CallbackQueryHandler(toggle_user, pattern="^toggle_"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message_ultra_fast))
 
-    print("⚡ ULTRA FAST SELLWS CHECKER 2025 - ENHANCED VERSION - RUNNING")
-    print(f"🇧🇩 Bangladesh Time: {(datetime.utcnow() + timedelta(hours=6)).strftime('%Y-%m-%d %H:%M:%S')}")
+    print("⚡ ULTRA FAST SELLWS CHECKER 2025 - FIXED VERSION - RUNNING")
+    print(f"🇧🇩 BD Time: {(datetime.utcnow() + timedelta(hours=6)).strftime('%Y-%m-%d %H:%M:%S')}")
 
     await app.initialize()
     await app.start()
@@ -1001,8 +881,8 @@ flask_app = Flask(__name__)
 def home():
     bangladesh_time = datetime.utcnow() + timedelta(hours=6)
     return f"""
-    <h1>⚡ ULTRA FAST SELLWS BOT 2025 - 100% ALIVE</h1>
-    <p>🇧🇩 Bangladesh Time: {bangladesh_time.strftime('%Y-%m-%d %H:%M:%S')}</p>
+    <h1>⚡ ULTRA FAST SELLWS BOT 2025 - FIXED</h1>
+    <p>🇧🇩 BD Time: {bangladesh_time.strftime('%Y-%m-%d %H:%M:%S')}</p>
     <p>Status: <span style="color: green; font-weight: bold;">● ONLINE</span></p>
     """
 
