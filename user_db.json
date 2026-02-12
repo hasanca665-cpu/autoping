@@ -486,75 +486,74 @@
       "allowed": false,
       "requested_at": "2026-02-12T10:00:00"
     }
-  }
-},
-    "stats": {
-        "5624278091": {
-            "messages": {
-                "daily": {
-                    "2025-12-28": 1
-                },
-                "total": 1
-            },
-            "fresh": {
-                "daily": {},
-                "total": 0
-            },
-            "total_checked": 0,
-            "fresh_found": 0,
-            "fresh_used": 0,
-            "daily_detail": {},
-            "daily": {
-                "2026-01-21": 19
-            },
-            "total": 19,
-            "total_fresh_found": 2,
-            "total_fresh_used": 2,
-            "fresh_found_daily": {
-                "2026-01-21": 2
-            },
-            "fresh_used_daily": {
-                "2026-01-21": 2
-            }
+  },
+  "stats": {
+    "5624278091": {
+      "messages": {
+        "daily": {
+          "2025-12-28": 1
         },
-        "7319925086": {
-            "daily": {
-                "2026-01-17": 5,
-                "2026-01-21": 5,
-                "2026-01-23": 35,
-                "2026-01-24": 5,
-                "2026-01-27": 10,
-                "2026-01-28": 32
-            },
-            "total": 92,
-            "total_fresh_found": 45,
-            "total_fresh_used": 16,
-            "fresh_found_daily": {
-                "2026-01-17": 0,
-                "2026-01-21": 0,
-                "2026-01-23": 18,
-                "2026-01-24": 2,
-                "2026-01-27": 7,
-                "2026-01-28": 18
-            },
-            "fresh_used_daily": {
-                "2026-01-17": 0,
-                "2026-01-21": 0,
-                "2026-01-23": 7,
-                "2026-01-24": 1,
-                "2026-01-27": 2,
-                "2026-01-28": 6
-            },
-            "total_checked": 1,
-            "fresh_found": 0,
-            "fresh_used": 0,
-            "daily_detail": {
-                "2026-01-17": {
-                    "checked": 1,
-                    "fresh_found": 0,
-                    "fresh_used": 0
-                }
-            }
+        "total": 1
+      },
+      "fresh": {
+        "daily": {},
+        "total": 0
+      },
+      "total_checked": 0,
+      "fresh_found": 0,
+      "fresh_used": 0,
+      "daily_detail": {},
+      "daily": {
+        "2026-01-21": 19
+      },
+      "total": 19,
+      "total_fresh_found": 2,
+      "total_fresh_used": 2,
+      "fresh_found_daily": {
+        "2026-01-21": 2
+      },
+      "fresh_used_daily": {
+        "2026-01-21": 2
+      }
+    },
+    "7319925086": {
+      "daily": {
+        "2026-01-17": 5,
+        "2026-01-21": 5,
+        "2026-01-23": 35,
+        "2026-01-24": 5,
+        "2026-01-27": 10,
+        "2026-01-28": 32
+      },
+      "total": 92,
+      "total_fresh_found": 45,
+      "total_fresh_used": 16,
+      "fresh_found_daily": {
+        "2026-01-17": 0,
+        "2026-01-21": 0,
+        "2026-01-23": 18,
+        "2026-01-24": 2,
+        "2026-01-27": 7,
+        "2026-01-28": 18
+      },
+      "fresh_used_daily": {
+        "2026-01-17": 0,
+        "2026-01-21": 0,
+        "2026-01-23": 7,
+        "2026-01-24": 1,
+        "2026-01-27": 2,
+        "2026-01-28": 6
+      },
+      "total_checked": 1,
+      "fresh_found": 0,
+      "fresh_used": 0,
+      "daily_detail": {
+        "2026-01-17": {
+          "checked": 1,
+          "fresh_found": 0,
+          "fresh_used": 0
         }
+      }
     }
+  }
 }
